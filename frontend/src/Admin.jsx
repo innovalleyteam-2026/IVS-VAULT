@@ -1,7 +1,7 @@
 // Main Project Vault CRM Client view
 import React, { useState, useEffect } from 'react';
 import { supabase } from './supabaseClient';
-import Login from './Login';
+import Login from './login';
 import AdminDashboard from './Admin';       // Your heavy, full CRM
 import EmployeeDashboard from './EmployeeDashboard'; // Simplified project view
 import ClientPortal from './ClientPortal';
