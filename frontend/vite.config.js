@@ -10,7 +10,7 @@ export default defineConfig({
   ],
   
   // 2. Set the relative base path at the root level so assets map properly
-  base: './', 
+  base: '/', 
   
   build: {
     outDir: 'dist',
