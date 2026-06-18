@@ -21,6 +21,10 @@
       "dest": "frontend/dist/assets/$1"
     },
     {
+      "src": "/(favicon.ico|manifest.json|robots.txt)",
+      "dest": "frontend/dist/$1"
+    },
+    {
       "handle": "filesystem"
     },
     {
