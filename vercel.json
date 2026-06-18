@@ -24,5 +24,5 @@
       "dest": "/index.html"
     }
   ],
-  "buildCommand": "cd ./backend && npm install && cd ../frontend && npm install && npm run build"
+  "buildCommand": "(cd ../backend && npm install && cd ../frontend && npm install && npm run build) || (cd ./backend && npm install && cd ../frontend && npm install && npm run build)"
 }
