@@ -3,11 +3,16 @@ import react from '@vitejs/plugin-react'
 import tailwindcss from '@tailwindcss/vite'
 
 export default defineConfig({
-  plugins: [react()],
-  // Add this build section
-  base: '/',
+  // 1. Properly include BOTH plugins in the array
+  plugins: [
+    react(),
+    tailwindcss() 
+  ],
+  
+  // 2. Set the relative base path at the root level so assets map properly
+  base: './', 
+  
   build: {
-    base: './',
     outDir: 'dist',
     assetsDir: 'assets',
     sourcemap: false,
