@@ -14,6 +14,15 @@ app.use(cors({ origin: 'http://localhost:5173' }));
 app.use(express.json({ limit: '50mb' }));
 app.use(express.urlencoded({ limit: '50mb', extended: true }));
 
+app.use(cors({
+  origin: [
+    'http://localhost:5173',
+    'https://secure.innovalley.in',
+    'https://ivs-vault-v.vercel.app'
+  ],
+  credentials: true
+}));
+
 // Initialize Supabase Client
 const supabaseUrl = process.env.SUPABASE_URL;
 const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
