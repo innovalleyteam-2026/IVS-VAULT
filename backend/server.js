@@ -12,8 +12,11 @@ import path from 'path';
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
-// Explicitly target the .env file located inside the backend folder
-dotenv.config({ path: path.join(__dirname, '.env') });
+// ONLY look for local .env file if running locally. 
+// On Vercel, process.env is populated natively by the dashboard dashboard.
+if (process.env.NODE_ENV !== 'production') {
+  dotenv.config({ path: path.join(__dirname, '.env') });
+}
 
 const app = express();
 
