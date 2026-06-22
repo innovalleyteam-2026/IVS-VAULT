@@ -20,7 +20,10 @@ dotenv.config({ path: path.join(__dirname, '.env') });
 
 const app = express();
 
-
+const PORT = process.env.PORT || 5000;
+app.listen(PORT, () => {
+  console.log(`🚀 Unified V2 Vault CRM Server listening on port ${PORT}`);
+});
 
 // Set high weight processing thresholds to prevent 413 attachment crashes
 app.use(cors({ origin: 'http://localhost:5173' }));
@@ -39,6 +42,12 @@ app.use(cors({
 // Initialize Supabase Client
 const supabaseUrl = process.env.SUPABASE_URL;
 const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+
+
+if (!supabaseUrl || !supabaseServiceKey) {
+  console.error("❌ CRITICAL: Missing SUPABASE_URL or SUPABASE_SERVICE_ROLE_KEY in backend/.env");
+  process.exit(1); // 👈 THIS IS SHUTTING DOWN THE CLOUD BUILD
+}
 
 if (!supabaseUrl || !supabaseServiceKey) {
   console.error("❌ CRITICAL: Missing SUPABASE_URL or SUPABASE_SERVICE_ROLE_KEY in backend/.env");
