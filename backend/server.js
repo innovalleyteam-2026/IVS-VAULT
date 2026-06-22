@@ -357,6 +357,40 @@ app.put('/api/notes/:id', async (req, res) => {
     res.status(500).json({ error: err.message });
   }
 });
+// ==========================================
+// PROFILES API BACKWARD COMPATIBILITY
+// ==========================================
+app.get('/api/profiles', async (req, res) => {
+  try {
+    const { role } = req.query;
+    let query = supabase.from('profiles').select('*');
+    
+    if (role) {
+      query = query.eq('role', role);
+    }
+
+    const { data, error } = await query;
+    if (error) return res.status(400).json({ error: error.message });
+    res.json({ data: data || [] });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.put('/api/profiles/:id', async (req, res) => {
+  try {
+    const { role, associated_project_id, full_name, company_name, phone_number } = req.body;
+    const { data, error } = await supabase.from('profiles')
+      .update({ role, associated_project_id, full_name, company_name, phone_number, updated_at: new Date() })
+      .eq('id', req.params.id)
+      .select();
+
+    if (error) return res.status(400).json({ error: error.message });
+    res.json(data[0]);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
 
 // ==========================================
 // BIND & EXPORT SERVER
