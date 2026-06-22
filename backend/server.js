@@ -13,6 +13,7 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
 // ONLY load local file configurations when running on localhost.
+// Vercel populates process.env automatically from your dashboard settings page!
 if (process.env.NODE_ENV !== 'production') {
   dotenv.config({ path: path.join(__dirname, '.env') });
 }
@@ -40,19 +41,40 @@ app.use(cors({
 const supabaseUrl = process.env.SUPABASE_URL;
 const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
 
-if (!supabaseUrl || !supabaseServiceKey) {
-  console.error("❌ CRITICAL: Missing SUPABASE_URL or SUPABASE_SERVICE_ROLE_KEY in environment variables.");
-  if (process.env.NODE_ENV !== 'production') {
-    process.exit(1);
+let supabase = null;
+
+try {
+  if (supabaseUrl && supabaseServiceKey) {
+    supabase = createClient(supabaseUrl, supabaseServiceKey, {
+      auth: {
+        persistSession: false,
+        autoRefreshToken: false,
+      },
+    });
+  } else {
+    console.error("⚠️ SUPABASE WARNING: URL or Service Key is missing from process.env.");
   }
+} catch (initError) {
+  console.error("❌ SUPABASE INITIALIZATION CRASH:", initError.message);
 }
 
-const supabase = createClient(supabaseUrl, supabaseServiceKey, {
-  auth: {
-    persistSession: false,
-    autoRefreshToken: false,
-  },
-});
+// Global safety check middleware to prevent unhandled 500 crashes
+const verifyDatabaseClient = (req, res, next) => {
+  if (!supabase) {
+    return res.status(500).json({ 
+      error: "Database client failed to initialize configuration parameters.",
+      diagnostics: { 
+        supabaseUrlPresent: !!supabaseUrl, 
+        supabaseServiceKeyPresent: !!supabaseServiceKey,
+        nodeEnv: process.env.NODE_ENV
+      }
+    });
+  }
+  next();
+};
+
+// Apply database safety shield to all /api routes
+app.use('/api', verifyDatabaseClient);
 
 // ==========================================
 // CRYPTOGRAPHY VAULT CORE ENGINE (AES-256-CBC)
@@ -62,7 +84,6 @@ const IV_LENGTH = 16;
 
 const getSecretKeyBuffer = () => {
   const secret = process.env.MASTER_CRYPTO_PASS_KEY || 'default-fallback-super-secret-key-32';
-  // Standardize back to a predictable hex block string buffer
   return crypto.createHash('sha256').update(String(secret).trim()).digest();
 };
 
@@ -188,21 +209,6 @@ app.get('/api/clients', async (req, res) => {
     const { data, error } = await supabase.from('profiles').select('*, projects(name)').eq('role', 'Client');
     if (error) return res.status(400).json({ error: error.message });
     res.json({ data: data || [] });
-  } catch (err) {
-    res.status(500).json({ error: err.message });
-  }
-});
-
-app.put('/api/profiles/:id', async (req, res) => {
-  try {
-    const { role, associated_project_id, full_name, company_name, phone_number } = req.body;
-    const { data, error } = await supabase.from('profiles')
-      .update({ role, associated_project_id, full_name, company_name, phone_number, updated_at: new Date() })
-      .eq('id', req.params.id)
-      .select();
-
-    if (error) return res.status(400).json({ error: error.message });
-    res.json(data[0]);
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
@@ -366,17 +372,12 @@ app.put('/api/notes/:id', async (req, res) => {
   }
 });
 
-// ==========================================
-// PROFILES API BACKWARD COMPATIBILITY
-// ==========================================
+// --- BACKWARD COMPATIBLE PROFILES ENDPOINTS ---
 app.get('/api/profiles', async (req, res) => {
   try {
     const { role } = req.query;
     let query = supabase.from('profiles').select('*');
-    
-    if (role) {
-      query = query.eq('role', role);
-    }
+    if (role) query = query.eq('role', role);
 
     const { data, error } = await query;
     if (error) return res.status(400).json({ error: error.message });
@@ -405,7 +406,6 @@ app.put('/api/profiles/:id', async (req, res) => {
 // BIND & EXPORT SERVER
 // ==========================================
 const PORT = process.env.PORT || 5000;
-
 if (process.env.NODE_ENV !== 'production') {
   app.listen(PORT, () => {
     console.log(`🚀 Unified V2 Vault CRM Server listening on port ${PORT}`);
