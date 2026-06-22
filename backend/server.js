@@ -12,14 +12,13 @@ import path from 'path';
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
-// ONLY look for local .env file if running locally. 
-// On Vercel, process.env is populated natively by the dashboard dashboard.
+// ONLY load local file configurations when running on localhost.
+// Vercel populates process.env automatically from your dashboard settings page!
 if (process.env.NODE_ENV !== 'production') {
   dotenv.config({ path: path.join(__dirname, '.env') });
 }
 
 const app = express();
-
 // ==========================================
 // MIDDLEWARE CONFIGURATION
 // ==========================================
