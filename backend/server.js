@@ -13,12 +13,12 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
 // ONLY load local file configurations when running on localhost.
-// Vercel populates process.env automatically from your dashboard settings page!
 if (process.env.NODE_ENV !== 'production') {
   dotenv.config({ path: path.join(__dirname, '.env') });
 }
 
 const app = express();
+
 // ==========================================
 // MIDDLEWARE CONFIGURATION
 // ==========================================
@@ -62,16 +62,22 @@ const IV_LENGTH = 16;
 
 const getSecretKeyBuffer = () => {
   const secret = process.env.MASTER_CRYPTO_PASS_KEY || 'default-fallback-super-secret-key-32';
-  return crypto.createHash('sha256').update(String(secret)).digest();
+  // Standardize back to a predictable hex block string buffer
+  return crypto.createHash('sha256').update(String(secret).trim()).digest();
 };
 
 const encryptPassword = (text) => {
   if (!text) return null;
-  const iv = crypto.randomBytes(IV_LENGTH);
-  const cipher = crypto.createCipheriv(ENCRYPTION_ALGORITHM, getSecretKeyBuffer(), iv);
-  let encrypted = cipher.update(text, 'utf8', 'hex');
-  encrypted += cipher.final('hex');
-  return `${iv.toString('hex')}:${encrypted}`;
+  try {
+    const iv = crypto.randomBytes(IV_LENGTH);
+    const cipher = crypto.createCipheriv(ENCRYPTION_ALGORITHM, getSecretKeyBuffer(), iv);
+    let encrypted = cipher.update(text, 'utf8', 'hex');
+    encrypted += cipher.final('hex');
+    return `${iv.toString('hex')}:${encrypted}`;
+  } catch (err) {
+    console.error('Encryption Engine Failure:', err.message);
+    return null;
+  }
 };
 
 const decryptPassword = (encryptedText) => {
@@ -205,13 +211,13 @@ app.put('/api/profiles/:id', async (req, res) => {
 app.get('/api/employees-with-shares', async (req, res) => {
   try {
     const { data: employees, error: empErr } = await supabase.from('profiles').select('*').neq('role', 'Client');
-    if (empErr) throw empErr;
+    if (empErr) return res.status(400).json({ error: empErr.message });
 
     const { data: shares, error: shareErr } = await supabase.from('project_shares').select('profile_id, project_id');
-    if (shareErr) throw shareErr;
+    if (shareErr) return res.status(400).json({ error: shareErr.message });
 
     const { data: projects, error: projErr } = await supabase.from('projects').select('id, name');
-    if (projErr) throw projErr;
+    if (projErr) return res.status(400).json({ error: projErr.message });
 
     const result = employees.map(emp => {
       const empShares = shares.filter(s => s.profile_id === emp.id);
@@ -359,6 +365,7 @@ app.put('/api/notes/:id', async (req, res) => {
     res.status(500).json({ error: err.message });
   }
 });
+
 // ==========================================
 // PROFILES API BACKWARD COMPATIBILITY
 // ==========================================
