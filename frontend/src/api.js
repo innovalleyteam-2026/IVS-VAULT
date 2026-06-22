@@ -3,9 +3,8 @@
 import axios from 'axios';
 
 const BASE_URL = window.location.hostname === 'localhost' 
-  ? 'http://localhost:5000' 
-  : `${window.location.origin}/api`; // 👈 Fix: Appends /api securely on Vercel production
-
+  ? 'http://localhost:5000/api' // Added /api here
+  : `${window.location.origin}/api`;
 const api = axios.create({ 
   baseURL: BASE_URL,
   withCredentials: true 

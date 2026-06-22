@@ -2,12 +2,25 @@ import express from 'express';
 import cors from 'cors';
 import dotenv from 'dotenv';
 import crypto from 'crypto';
+import { fileURLToPath } from 'url'; // This ensures it extracts correctly
 import { createClient } from '@supabase/supabase-js';
+import path from 'path'; // 1. Import the native path utility
 
 // Load environment variables from backend/.env
 dotenv.config();
+// 2. Setup ES module __dirname equivalents
+
+
+// Setup ES module __dirname equivalents safely
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+
+// Explicitly point to the backend/.env file 
+dotenv.config({ path: path.join(__dirname, '.env') });
 
 const app = express();
+
+
 
 // Set high weight processing thresholds to prevent 413 attachment crashes
 app.use(cors({ origin: 'http://localhost:5173' }));
