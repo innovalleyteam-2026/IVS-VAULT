@@ -89,14 +89,11 @@ const decryptPassword = (encryptedText) => {
 };
 
 // ==========================================
-// 🛠️ DYNAMIC ROUTING PATH PREFIX MANAGER
+// API ENDPOINTS & INTEGRATIONS WITH /api PREFIX
 // ==========================================
-// Locally, the route stays /api/projects. 
-// On Vercel, the rewrite handles /api globally, so the route becomes /projects inside the function.
-const router = express.Router();
 
 // --- PROJECTS PIPELINES ROUTING ---
-router.get('/projects', async (req, res) => {
+app.get('/api/projects', async (req, res) => {
   try {
     const { data, error } = await supabase.from('projects').select('*').order('created_at', { ascending: false });
     if (error) return res.status(400).json({ error: error.message });
@@ -106,7 +103,7 @@ router.get('/projects', async (req, res) => {
   }
 });
 
-router.post('/projects', async (req, res) => {
+app.post('/api/projects', async (req, res) => {
   try {
     const { name, client_name, status, start_date, due_date, description, remarks, email, phone, comments } = req.body;
     const { data, error } = await supabase.from('projects').insert([{
@@ -121,7 +118,7 @@ router.post('/projects', async (req, res) => {
 });
 
 // --- ENCRYPTED VAULT ROBUST UTILITIES ---
-router.get('/projects/:projectId/credentials', async (req, res) => {
+app.get('/api/projects/:projectId/credentials', async (req, res) => {
   try {
     const { data, error } = await supabase.from('credentials').select('*').eq('project_id', req.params.projectId);
     if (error) return res.status(400).json({ error: error.message });
@@ -134,7 +131,7 @@ router.get('/projects/:projectId/credentials', async (req, res) => {
   }
 });
 
-router.post('/credentials', async (req, res) => {
+app.post('/api/credentials', async (req, res) => {
   try {
     const { project_id, title, category, login_url, auth_type, email, username, plain_password, remarks, client_visible, expiry_date } = req.body;
     const securedPassword = encryptPassword(plain_password);
@@ -150,7 +147,7 @@ router.post('/credentials', async (req, res) => {
   }
 });
 
-router.post('/credentials/:id/decrypt', async (req, res) => {
+app.post('/api/credentials/:id/decrypt', async (req, res) => {
   try {
     const { masterKey } = req.body;
     if (masterKey !== process.env.MASTER_CLEARANCE_TOKEN) {
@@ -168,7 +165,7 @@ router.post('/credentials/:id/decrypt', async (req, res) => {
 });
 
 // --- STAFF EMPLOYEE & MANAGEMENT CHANNELS ---
-router.get('/employees', async (req, res) => {
+app.get('/api/employees', async (req, res) => {
   try {
     const { data, error } = await supabase.from('profiles').select('*').neq('role', 'Client');
     if (error) return res.status(400).json({ error: error.message });
@@ -178,7 +175,7 @@ router.get('/employees', async (req, res) => {
   }
 });
 
-router.get('/clients', async (req, res) => {
+app.get('/api/clients', async (req, res) => {
   try {
     const { data, error } = await supabase.from('profiles').select('*, projects(name)').eq('role', 'Client');
     if (error) return res.status(400).json({ error: error.message });
@@ -188,7 +185,7 @@ router.get('/clients', async (req, res) => {
   }
 });
 
-router.put('/profiles/:id', async (req, res) => {
+app.put('/api/profiles/:id', async (req, res) => {
   try {
     const { role, associated_project_id, full_name, company_name, phone_number } = req.body;
     const { data, error } = await supabase.from('profiles')
@@ -203,7 +200,7 @@ router.put('/profiles/:id', async (req, res) => {
   }
 });
 
-router.get('/employees-with-shares', async (req, res) => {
+app.get('/api/employees-with-shares', async (req, res) => {
   try {
     const { data: employees, error: empErr } = await supabase.from('profiles').select('*').neq('role', 'Client');
     if (empErr) throw empErr;
@@ -230,7 +227,7 @@ router.get('/employees-with-shares', async (req, res) => {
 });
 
 // --- GRANULAR WORKSPACE CROSS-TENANT SHARE LEDGERS ---
-router.get('/projects/:projectId/shares', async (req, res) => {
+app.get('/api/projects/:projectId/shares', async (req, res) => {
   try {
     const { data, error } = await supabase.from('project_shares').select('*, profiles(full_name, role)').eq('project_id', req.params.projectId);
     if (error) return res.status(400).json({ error: error.message });
@@ -240,7 +237,7 @@ router.get('/projects/:projectId/shares', async (req, res) => {
   }
 });
 
-router.post('/project-shares', async (req, res) => {
+app.post('/api/project-shares', async (req, res) => {
   try {
     const { project_id, profile_id, can_view, can_edit_credentials, can_edit_notes, can_edit_files } = req.body;
     const { data, error } = await supabase.from('project_shares').upsert({
@@ -255,7 +252,7 @@ router.post('/project-shares', async (req, res) => {
 });
 
 // --- RENEWALS & TIMELINE REMINDERS MODULES ---
-router.get('/renewals', async (req, res) => {
+app.get('/api/renewals', async (req, res) => {
   try {
     const { data, error } = await supabase.from('reminders').select('*').order('expiry_date', { ascending: true });
     if (error) return res.status(400).json({ error: error.message });
@@ -265,7 +262,7 @@ router.get('/renewals', async (req, res) => {
   }
 });
 
-router.get('/projects/:projectId/reminders', async (req, res) => {
+app.get('/api/projects/:projectId/reminders', async (req, res) => {
   try {
     const { data, error } = await supabase.from('reminders').select('*').eq('project_id', req.params.projectId);
     if (error) return res.status(400).json({ error: error.message });
@@ -275,7 +272,7 @@ router.get('/projects/:projectId/reminders', async (req, res) => {
   }
 });
 
-router.post('/reminders', async (req, res) => {
+app.post('/api/reminders', async (req, res) => {
   try {
     const { project_id, title, type, expiry_date, reminder_days } = req.body;
     const { data, error } = await supabase.from('reminders').insert([{
@@ -290,7 +287,7 @@ router.post('/reminders', async (req, res) => {
 });
 
 // --- BINARY METADATA AND FILE POINTER STORES ---
-router.get('/projects/:projectId/files', async (req, res) => {
+app.get('/api/projects/:projectId/files', async (req, res) => {
   try {
     const { data, error } = await supabase.from('files').select('*').eq('project_id', req.params.projectId);
     if (error) return res.status(400).json({ error: error.message });
@@ -300,7 +297,7 @@ router.get('/projects/:projectId/files', async (req, res) => {
   }
 });
 
-router.post('/files', async (req, res) => {
+app.post('/api/files', async (req, res) => {
   try {
     const { project_id, name, file_type, client_visible, file_data } = req.body;
     const { data, error } = await supabase.from('files').insert([{
@@ -314,7 +311,7 @@ router.post('/files', async (req, res) => {
   }
 });
 
-router.put('/files/:id', async (req, res) => {
+app.put('/api/files/:id', async (req, res) => {
   try {
     const { client_visible } = req.body;
     const { data, error } = await supabase.from('files').update({ client_visible, updated_at: new Date() }).eq('id', req.params.id).select();
@@ -326,7 +323,7 @@ router.put('/files/:id', async (req, res) => {
 });
 
 // --- NOTEPAD MARKDOWN FRAGMENTS SYSTEM ---
-router.get('/projects/:projectId/notes', async (req, res) => {
+app.get('/api/projects/:projectId/notes', async (req, res) => {
   try {
     const { data, error } = await supabase.from('notes').select('*').eq('project_id', req.params.projectId);
     if (error) return res.status(400).json({ error: error.message });
@@ -336,7 +333,7 @@ router.get('/projects/:projectId/notes', async (req, res) => {
   }
 });
 
-router.post('/notes', async (req, res) => {
+app.post('/api/notes', async (req, res) => {
   try {
     const { project_id, title, content, client_visible, tags } = req.body;
     const { data, error } = await supabase.from('notes').insert([{
@@ -350,7 +347,7 @@ router.post('/notes', async (req, res) => {
   }
 });
 
-router.put('/notes/:id', async (req, res) => {
+app.put('/api/notes/:id', async (req, res) => {
   try {
     const { title, content, client_visible, tags } = req.body;
     const { data, error } = await supabase.from('notes').update({ title, content, client_visible, tags, updated_at: new Date() }).eq('id', req.params.id).select();
@@ -360,10 +357,6 @@ router.put('/notes/:id', async (req, res) => {
     res.status(500).json({ error: err.message });
   }
 });
-
-// Mount the router onto both paths to support both localhost (/api/projects) and Vercel Serverless Function context (/)
-app.use('/api', router);
-app.use('/', router);
 
 // ==========================================
 // BIND & EXPORT SERVER
