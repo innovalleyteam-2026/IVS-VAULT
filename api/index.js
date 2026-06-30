@@ -1,10 +1,9 @@
-import express from 'express';
-import cors from 'cors';
-import dotenv from 'dotenv';
-import crypto from 'crypto';
-import { fileURLToPath } from 'url'; 
-import { createClient } from '@supabase/supabase-js';
-import path from 'path'; 
+const express = require('express');
+const cors = require('cors');
+const dotenv = require('dotenv');
+const crypto = require('crypto');
+const { createClient } = require('@supabase/supabase-js');
+const path = require('path');
 
 // ==========================================
 // ENVIRONMENT & MODULE INITIALIZATION
@@ -414,4 +413,4 @@ if (process.env.NODE_ENV !== 'production') {
   });
 }
 
-export default app;
+module.exports = app;
