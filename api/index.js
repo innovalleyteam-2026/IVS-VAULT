@@ -1,29 +1,11 @@
-const express = require('express');
-const cors = require('cors');
-const dotenv = require('dotenv');
-const crypto = require('crypto');
-const { createClient } = require('@supabase/supabase-js');
-const path = require('path');
+import express from 'express';
+import cors from 'cors';
+import crypto from 'crypto';
+import { createClient } from '@supabase/supabase-js';
 
-// ==========================================
-// ENVIRONMENT & MODULE INITIALIZATION
-// ==========================================
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
-
-// ONLY load local file configurations when running on localhost.
-// Vercel populates process.env automatically from your dashboard settings page!
-
-
-// 🛡️ ONLY look for a local .env file if running locally (not on Vercel production)
-if (process.env.NODE_ENV !== 'production') {
-  dotenv.config({ path: path.join(__dirname, '.env') });
-}
 const app = express();
 
-// ==========================================
-// MIDDLEWARE CONFIGURATION
-// ==========================================
+// Middleware Configuration
 app.use(express.json({ limit: '50mb' }));
 app.use(express.urlencoded({ limit: '50mb', extended: true }));
 
@@ -31,75 +13,50 @@ app.use(cors({
   origin: [
     'http://localhost:5173',
     'https://secure.innovalley.in',
-    'https://ivs-vault-v.vercel.app'
+    'https://ivs-vault-v.vercel.app',
+    'https://ivs-vault-2le55qscg-innovalleyteam-6905s-projects.vercel.app'
   ],
   credentials: true
 }));
 
 // ==========================================
-// SUPABASE DATABASE ROUTER INITIALIZATION
+// SUPABASE DATABASE INITIALIZATION
 // ==========================================
 const supabaseUrl = process.env.SUPABASE_URL;
 const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
-
 let supabase = null;
 
-try {
-  if (supabaseUrl && supabaseServiceKey) {
-    supabase = createClient(supabaseUrl, supabaseServiceKey, {
-      auth: {
-        persistSession: false,
-        autoRefreshToken: false,
-      },
-    });
-  } else {
-    console.error("⚠️ SUPABASE WARNING: URL or Service Key is missing from process.env.");
-  }
-} catch (initError) {
-  console.error("❌ SUPABASE INITIALIZATION CRASH:", initError.message);
+if (supabaseUrl && supabaseServiceKey) {
+  supabase = createClient(supabaseUrl, supabaseServiceKey, {
+    auth: {
+      persistSession: false,
+      autoRefreshToken: false,
+    },
+  });
 }
 
-// Global safety check middleware to prevent unhandled 500 crashes
-const verifyDatabaseClient = (req, res, next) => {
+// Global safety check middleware to prevent crashes if keys are uninitialized
+app.use('/api', (req, res, next) => {
   if (!supabase) {
     return res.status(500).json({ 
       error: "Database client failed to initialize configuration parameters.",
       diagnostics: { 
         supabaseUrlPresent: !!supabaseUrl, 
-        supabaseServiceKeyPresent: !!supabaseServiceKey,
-        nodeEnv: process.env.NODE_ENV
+        supabaseServiceKeyPresent: !!supabaseServiceKey
       }
     });
   }
   next();
-};
-
-// Apply database safety shield to all /api routes
-app.use('/api', verifyDatabaseClient);
+});
 
 // ==========================================
-// CRYPTOGRAPHY VAULT CORE ENGINE (AES-256-CBC)
+// CRYPTOGRAPHY VAULT ENGINE (AES-256-CBC)
 // ==========================================
 const ENCRYPTION_ALGORITHM = 'aes-256-cbc';
-const IV_LENGTH = 16;
 
 const getSecretKeyBuffer = () => {
   const secret = process.env.MASTER_CRYPTO_PASS_KEY || 'default-fallback-super-secret-key-32';
   return crypto.createHash('sha256').update(String(secret).trim()).digest();
-};
-
-const encryptPassword = (text) => {
-  if (!text) return null;
-  try {
-    const iv = crypto.randomBytes(IV_LENGTH);
-    const cipher = crypto.createCipheriv(ENCRYPTION_ALGORITHM, getSecretKeyBuffer(), iv);
-    let encrypted = cipher.update(text, 'utf8', 'hex');
-    encrypted += cipher.final('hex');
-    return `${iv.toString('hex')}:${encrypted}`;
-  } catch (err) {
-    console.error('Encryption Engine Failure:', err.message);
-    return null;
-  }
 };
 
 const decryptPassword = (encryptedText) => {
@@ -113,13 +70,12 @@ const decryptPassword = (encryptedText) => {
     decrypted += decipher.final('utf8');
     return decrypted;
   } catch (err) {
-    console.error('Decryption Error Context:', err.message);
     return '[Decryption Failure]';
   }
 };
 
 // ==========================================
-// API ENDPOINTS & INTEGRATIONS WITH /api PREFIX
+// ROUTE ENDPOINTS
 // ==========================================
 
 // --- PROJECTS PIPELINES ROUTING ---
@@ -128,67 +84,6 @@ app.get('/api/projects', async (req, res) => {
     const { data, error } = await supabase.from('projects').select('*').order('created_at', { ascending: false });
     if (error) return res.status(400).json({ error: error.message });
     res.json({ data: data || [] });
-  } catch (err) {
-    res.status(500).json({ error: err.message });
-  }
-});
-
-app.post('/api/projects', async (req, res) => {
-  try {
-    const { name, client_name, status, start_date, due_date, description, remarks, email, phone, comments } = req.body;
-    const { data, error } = await supabase.from('projects').insert([{
-      name, client_name, status, start_date, due_date, description, remarks, email, phone, comments, created_at: new Date()
-    }]).select();
-
-    if (error) return res.status(400).json({ error: error.message });
-    res.status(201).json({ data: data[0] });
-  } catch (err) {
-    res.status(500).json({ error: err.message });
-  }
-});
-
-// --- ENCRYPTED VAULT ROBUST UTILITIES ---
-app.get('/api/projects/:projectId/credentials', async (req, res) => {
-  try {
-    const { data, error } = await supabase.from('credentials').select('*').eq('project_id', req.params.projectId);
-    if (error) return res.status(400).json({ error: error.message });
-    
-    // Mask passwords by default on public retrieval
-    const masked = (data || []).map(c => ({ ...c, plain_password: '••••••••' }));
-    res.json({ data: masked });
-  } catch (err) {
-    res.status(500).json({ error: err.message });
-  }
-});
-
-app.post('/api/credentials', async (req, res) => {
-  try {
-    const { project_id, title, category, login_url, auth_type, email, username, plain_password, remarks, client_visible, expiry_date } = req.body;
-    const securedPassword = encryptPassword(plain_password);
-
-    const { data, error } = await supabase.from('credentials').insert([{
-      project_id, title, category, login_url, auth_type, email, username, plain_password: securedPassword, remarks, client_visible, expiry_date, created_at: new Date()
-    }]).select();
-
-    if (error) return res.status(400).json({ error: error.message });
-    res.status(201).json({ data: data[0] });
-  } catch (err) {
-    res.status(500).json({ error: err.message });
-  }
-});
-
-app.post('/api/credentials/:id/decrypt', async (req, res) => {
-  try {
-    const { masterKey } = req.body;
-    if (masterKey !== process.env.MASTER_CLEARANCE_TOKEN) {
-      return res.status(403).json({ error: 'Invalid master passphrase clearance.' });
-    }
-
-    const { data, error } = await supabase.from('credentials').select('plain_password').eq('id', req.params.id).single();
-    if (error || !data) return res.status(400).json({ error: 'Record location failed.' });
-
-    const decrypted = decryptPassword(data.plain_password);
-    res.json({ data: { password: decrypted } });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
@@ -215,202 +110,5 @@ app.get('/api/clients', async (req, res) => {
   }
 });
 
-app.get('/api/employees-with-shares', async (req, res) => {
-  try {
-    const { data: employees, error: empErr } = await supabase.from('profiles').select('*').neq('role', 'Client');
-    if (empErr) return res.status(400).json({ error: empErr.message });
-
-    const { data: shares, error: shareErr } = await supabase.from('project_shares').select('profile_id, project_id');
-    if (shareErr) return res.status(400).json({ error: shareErr.message });
-
-    const { data: projects, error: projErr } = await supabase.from('projects').select('id, name');
-    if (projErr) return res.status(400).json({ error: projErr.message });
-
-    const result = employees.map(emp => {
-      const empShares = shares.filter(s => s.profile_id === emp.id);
-      const assignedProjects = empShares.map(s => {
-        const proj = projects.find(p => p.id === s.project_id);
-        return proj ? proj.name : "Unknown Project";
-      });
-      return { ...emp, assigned_projects: assignedProjects };
-    });
-
-    res.json({ data: result });
-  } catch (err) {
-    res.status(500).json({ error: err.message });
-  }
-});
-
-// --- GRANULAR WORKSPACE CROSS-TENANT SHARE LEDGERS ---
-app.get('/api/projects/:projectId/shares', async (req, res) => {
-  try {
-    const { data, error } = await supabase.from('project_shares').select('*, profiles(full_name, role)').eq('project_id', req.params.projectId);
-    if (error) return res.status(400).json({ error: error.message });
-    res.json({ data: data || [] });
-  } catch (err) {
-    res.status(500).json({ error: err.message });
-  }
-});
-
-app.post('/api/project-shares', async (req, res) => {
-  try {
-    const { project_id, profile_id, can_view, can_edit_credentials, can_edit_notes, can_edit_files } = req.body;
-    const { data, error } = await supabase.from('project_shares').upsert({
-      project_id, profile_id, can_view, can_edit_credentials, can_edit_notes, can_edit_files, updated_at: new Date()
-    }, { onConflict: 'project_id,profile_id' }).select();
-
-    if (error) return res.status(400).json({ error: error.message });
-    res.json({ data: data[0] });
-  } catch (err) {
-    res.status(500).json({ error: err.message });
-  }
-});
-
-// --- RENEWALS & TIMELINE REMINDERS MODULES ---
-app.get('/api/renewals', async (req, res) => {
-  try {
-    const { data, error } = await supabase.from('reminders').select('*').order('expiry_date', { ascending: true });
-    if (error) return res.status(400).json({ error: error.message });
-    res.json({ data: data || [] });
-  } catch (err) {
-    res.status(500).json({ error: err.message });
-  }
-});
-
-app.get('/api/projects/:projectId/reminders', async (req, res) => {
-  try {
-    const { data, error } = await supabase.from('reminders').select('*').eq('project_id', req.params.projectId);
-    if (error) return res.status(400).json({ error: error.message });
-    res.json({ data: data || [] });
-  } catch (err) {
-    res.status(500).json({ error: err.message });
-  }
-});
-
-app.post('/api/reminders', async (req, res) => {
-  try {
-    const { project_id, title, type, expiry_date, reminder_days } = req.body;
-    const { data, error } = await supabase.from('reminders').insert([{
-      project_id, title, type, expiry_date, reminder_days, created_at: new Date()
-    }]).select();
-
-    if (error) return res.status(400).json({ error: error.message });
-    res.status(201).json({ data: data[0] });
-  } catch (err) {
-    res.status(500).json({ error: err.message });
-  }
-});
-
-// --- BINARY METADATA AND FILE POINTER STORES ---
-app.get('/api/projects/:projectId/files', async (req, res) => {
-  try {
-    const { data, error } = await supabase.from('files').select('*').eq('project_id', req.params.projectId);
-    if (error) return res.status(400).json({ error: error.message });
-    res.json({ data: data || [] });
-  } catch (err) {
-    res.status(500).json({ error: err.message });
-  }
-});
-
-app.post('/api/files', async (req, res) => {
-  try {
-    const { project_id, name, file_type, client_visible, file_data } = req.body;
-    const { data, error } = await supabase.from('files').insert([{
-      project_id, name, file_type, client_visible, file_data, created_at: new Date()
-    }]).select();
-
-    if (error) return res.status(400).json({ error: error.message });
-    res.status(201).json({ data: data[0] });
-  } catch (err) {
-    res.status(500).json({ error: err.message });
-  }
-});
-
-app.put('/api/files/:id', async (req, res) => {
-  try {
-    const { client_visible } = req.body;
-    const { data, error } = await supabase.from('files').update({ client_visible, updated_at: new Date() }).eq('id', req.params.id).select();
-    if (error) return res.status(400).json({ error: error.message });
-    res.json({ data: data[0] });
-  } catch (err) {
-    res.status(500).json({ error: err.message });
-  }
-});
-
-// --- NOTEPAD MARKDOWN FRAGMENTS SYSTEM ---
-app.get('/api/projects/:projectId/notes', async (req, res) => {
-  try {
-    const { data, error } = await supabase.from('notes').select('*').eq('project_id', req.params.projectId);
-    if (error) return res.status(400).json({ error: error.message });
-    res.json({ data: data || [] });
-  } catch (err) {
-    res.status(500).json({ error: err.message });
-  }
-});
-
-app.post('/api/notes', async (req, res) => {
-  try {
-    const { project_id, title, content, client_visible, tags } = req.body;
-    const { data, error } = await supabase.from('notes').insert([{
-      project_id, title, content, client_visible, tags, created_at: new Date()
-    }]).select();
-
-    if (error) return res.status(400).json({ error: error.message });
-    res.status(201).json({ data: data[0] });
-  } catch (err) {
-    res.status(500).json({ error: err.message });
-  }
-});
-
-app.put('/api/notes/:id', async (req, res) => {
-  try {
-    const { title, content, client_visible, tags } = req.body;
-    const { data, error } = await supabase.from('notes').update({ title, content, client_visible, tags, updated_at: new Date() }).eq('id', req.params.id).select();
-    if (error) return res.status(400).json({ error: error.message });
-    res.json({ data: data[0] });
-  } catch (err) {
-    res.status(500).json({ error: err.message });
-  }
-});
-
-// --- BACKWARD COMPATIBLE PROFILES ENDPOINTS ---
-app.get('/api/profiles', async (req, res) => {
-  try {
-    const { role } = req.query;
-    let query = supabase.from('profiles').select('*');
-    if (role) query = query.eq('role', role);
-
-    const { data, error } = await query;
-    if (error) return res.status(400).json({ error: error.message });
-    res.json({ data: data || [] });
-  } catch (err) {
-    res.status(500).json({ error: err.message });
-  }
-});
-
-app.put('/api/profiles/:id', async (req, res) => {
-  try {
-    const { role, associated_project_id, full_name, company_name, phone_number } = req.body;
-    const { data, error } = await supabase.from('profiles')
-      .update({ role, associated_project_id, full_name, company_name, phone_number, updated_at: new Date() })
-      .eq('id', req.params.id)
-      .select();
-
-    if (error) return res.status(400).json({ error: error.message });
-    res.json(data[0]);
-  } catch (err) {
-    res.status(500).json({ error: err.message });
-  }
-});
-
-// ==========================================
-// BIND & EXPORT SERVER
-// ==========================================
-const PORT = process.env.PORT || 5000;
-if (process.env.NODE_ENV !== 'production') {
-  app.listen(PORT, () => {
-    console.log(`🚀 Unified V2 Vault CRM Server listening on port ${PORT}`);
-  });
-}
-
-module.exports = app;
+// Export the app using standard ES module syntax
+export default app;
