@@ -14,10 +14,12 @@ const __dirname = path.dirname(__filename);
 
 // ONLY load local file configurations when running on localhost.
 // Vercel populates process.env automatically from your dashboard settings page!
+
+
+// 🛡️ ONLY look for a local .env file if running locally (not on Vercel production)
 if (process.env.NODE_ENV !== 'production') {
   dotenv.config({ path: path.join(__dirname, '.env') });
 }
-
 const app = express();
 
 // ==========================================
