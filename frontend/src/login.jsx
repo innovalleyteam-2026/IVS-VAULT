@@ -98,7 +98,7 @@ const handleVerifyOtp = async (e) => {
               <input 
                 type="text" required onChange={(e) => setOtp(e.target.value)}
                 className="w-full bg-slate-950 border border-slate-800 text-white rounded-lg pl-10 pr-4 py-2.5 outline-none focus:border-violet-500 transition text-center tracking-widest text-lg"
-                placeholder="000000"
+                placeholder="0000-0000"
               />
             </div>
             <button disabled={loading} className="w-full bg-violet-600 hover:bg-violet-700 text-white font-bold py-2.5 rounded-lg transition">

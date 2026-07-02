@@ -261,4 +261,6 @@ app.put('/api/profiles/:id', async (req, res) => {
   }
 });
 
+
+// Add this to the absolute bottom line of your root api/index.js file:
 export default app;
