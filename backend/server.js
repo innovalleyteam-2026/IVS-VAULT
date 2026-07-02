@@ -6,25 +6,14 @@ import { fileURLToPath } from 'url';
 import { createClient } from '@supabase/supabase-js';
 import path from 'path'; 
 
-// ==========================================
-// ENVIRONMENT & MODULE INITIALIZATION
-// ==========================================
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
-// ONLY load local file configurations when running on localhost.
-// Vercel populates process.env automatically from your dashboard settings page!
-
-
-// 🛡️ ONLY look for a local .env file if running locally (not on Vercel production)
 if (process.env.NODE_ENV !== 'production') {
   dotenv.config({ path: path.join(__dirname, '.env') });
 }
 const app = express();
 
-// ==========================================
-// MIDDLEWARE CONFIGURATION
-// ==========================================
 app.use(express.json({ limit: '50mb' }));
 app.use(express.urlencoded({ limit: '50mb', extended: true }));
 
@@ -37,9 +26,6 @@ app.use(cors({
   credentials: true
 }));
 
-// ==========================================
-// SUPABASE DATABASE ROUTER INITIALIZATION
-// ==========================================
 const supabaseUrl = process.env.SUPABASE_URL;
 const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
 
@@ -48,10 +34,7 @@ let supabase = null;
 try {
   if (supabaseUrl && supabaseServiceKey) {
     supabase = createClient(supabaseUrl, supabaseServiceKey, {
-      auth: {
-        persistSession: false,
-        autoRefreshToken: false,
-      },
+      auth: { persistSession: false, autoRefreshToken: false },
     });
   } else {
     console.error("⚠️ SUPABASE WARNING: URL or Service Key is missing from process.env.");
@@ -60,27 +43,17 @@ try {
   console.error("❌ SUPABASE INITIALIZATION CRASH:", initError.message);
 }
 
-// Global safety check middleware to prevent unhandled 500 crashes
 const verifyDatabaseClient = (req, res, next) => {
   if (!supabase) {
     return res.status(500).json({ 
-      error: "Database client failed to initialize configuration parameters.",
-      diagnostics: { 
-        supabaseUrlPresent: !!supabaseUrl, 
-        supabaseServiceKeyPresent: !!supabaseServiceKey,
-        nodeEnv: process.env.NODE_ENV
-      }
+      error: "Database client failed to initialize configuration parameters."
     });
   }
   next();
 };
 
-// Apply database safety shield to all /api routes
 app.use('/api', verifyDatabaseClient);
 
-// ==========================================
-// CRYPTOGRAPHY VAULT CORE ENGINE (AES-256-CBC)
-// ==========================================
 const ENCRYPTION_ALGORITHM = 'aes-256-cbc';
 const IV_LENGTH = 16;
 
@@ -98,7 +71,6 @@ const encryptPassword = (text) => {
     encrypted += cipher.final('hex');
     return `${iv.toString('hex')}:${encrypted}`;
   } catch (err) {
-    console.error('Encryption Engine Failure:', err.message);
     return null;
   }
 };
@@ -114,16 +86,11 @@ const decryptPassword = (encryptedText) => {
     decrypted += decipher.final('utf8');
     return decrypted;
   } catch (err) {
-    console.error('Decryption Error Context:', err.message);
     return '[Decryption Failure]';
   }
 };
 
-// ==========================================
-// API ENDPOINTS & INTEGRATIONS WITH /api PREFIX
-// ==========================================
-
-// --- PROJECTS PIPELINES ROUTING ---
+// --- PROJECTS PIPELINES ---
 app.get('/api/projects', async (req, res) => {
   try {
     const { data, error } = await supabase.from('projects').select('*').order('created_at', { ascending: false });
@@ -148,15 +115,12 @@ app.post('/api/projects', async (req, res) => {
   }
 });
 
-// --- ENCRYPTED VAULT ROBUST UTILITIES ---
+// --- CREDENTIALS (MAPPED TO encrypted_password) ---
 app.get('/api/projects/:projectId/credentials', async (req, res) => {
   try {
     const { data, error } = await supabase.from('credentials').select('*').eq('project_id', req.params.projectId);
     if (error) return res.status(400).json({ error: error.message });
-    
-    // Mask passwords by default on public retrieval
-    const masked = (data || []).map(c => ({ ...c, plain_password: '••••••••' }));
-    res.json({ data: masked });
+    res.json({ data: data || [] });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
@@ -167,8 +131,9 @@ app.post('/api/credentials', async (req, res) => {
     const { project_id, title, category, login_url, auth_type, email, username, plain_password, remarks, client_visible, expiry_date } = req.body;
     const securedPassword = encryptPassword(plain_password);
 
+    // 🛠️ FIX: Column name set correctly to match 'encrypted_password' in Supabase
     const { data, error } = await supabase.from('credentials').insert([{
-      project_id, title, category, login_url, auth_type, email, username, plain_password: securedPassword, remarks, client_visible, expiry_date, created_at: new Date()
+      project_id, title, category, login_url, auth_type, email, username, encrypted_password: securedPassword, remarks, client_visible, expiry_date, created_at: new Date()
     }]).select();
 
     if (error) return res.status(400).json({ error: error.message });
@@ -185,17 +150,18 @@ app.post('/api/credentials/:id/decrypt', async (req, res) => {
       return res.status(403).json({ error: 'Invalid master passphrase clearance.' });
     }
 
-    const { data, error } = await supabase.from('credentials').select('plain_password').eq('id', req.params.id).single();
+    // 🛠️ FIX: Select column 'encrypted_password' instead of 'plain_password'
+    const { data, error } = await supabase.from('credentials').select('encrypted_password').eq('id', req.params.id).single();
     if (error || !data) return res.status(400).json({ error: 'Record location failed.' });
 
-    const decrypted = decryptPassword(data.plain_password);
+    const decrypted = decryptPassword(data.encrypted_password);
     res.json({ data: { password: decrypted } });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
 });
 
-// --- STAFF EMPLOYEE & MANAGEMENT CHANNELS ---
+// --- STAFF EMPLOYEE PANELS ---
 app.get('/api/employees', async (req, res) => {
   try {
     const { data, error } = await supabase.from('profiles').select('*').neq('role', 'Client');
@@ -242,7 +208,7 @@ app.get('/api/employees-with-shares', async (req, res) => {
   }
 });
 
-// --- GRANULAR WORKSPACE CROSS-TENANT SHARE LEDGERS ---
+// --- WORKSPACE SHARES LEDGERS ---
 app.get('/api/projects/:projectId/shares', async (req, res) => {
   try {
     const { data, error } = await supabase.from('project_shares').select('*, profiles(full_name, role)').eq('project_id', req.params.projectId);
@@ -267,7 +233,7 @@ app.post('/api/project-shares', async (req, res) => {
   }
 });
 
-// --- RENEWALS & TIMELINE REMINDERS MODULES ---
+// --- RENEWALS & REMINDERS ---
 app.get('/api/renewals', async (req, res) => {
   try {
     const { data, error } = await supabase.from('reminders').select('*').order('expiry_date', { ascending: true });
@@ -302,7 +268,7 @@ app.post('/api/reminders', async (req, res) => {
   }
 });
 
-// --- BINARY METADATA AND FILE POINTER STORES ---
+// --- STORAGE FILES ---
 app.get('/api/projects/:projectId/files', async (req, res) => {
   try {
     const { data, error } = await supabase.from('files').select('*').eq('project_id', req.params.projectId);
@@ -338,7 +304,7 @@ app.put('/api/files/:id', async (req, res) => {
   }
 });
 
-// --- NOTEPAD MARKDOWN FRAGMENTS SYSTEM ---
+// --- NOTEPAD SYSTEM ---
 app.get('/api/projects/:projectId/notes', async (req, res) => {
   try {
     const { data, error } = await supabase.from('notes').select('*').eq('project_id', req.params.projectId);
@@ -374,7 +340,7 @@ app.put('/api/notes/:id', async (req, res) => {
   }
 });
 
-// --- BACKWARD COMPATIBLE PROFILES ENDPOINTS ---
+// --- PROFILES ---
 app.get('/api/profiles', async (req, res) => {
   try {
     const { role } = req.query;
@@ -404,13 +370,10 @@ app.put('/api/profiles/:id', async (req, res) => {
   }
 });
 
-// ==========================================
-// BIND & EXPORT SERVER
-// ==========================================
 const PORT = process.env.PORT || 5000;
 if (process.env.NODE_ENV !== 'production') {
   app.listen(PORT, () => {
-    console.log(`🚀 Unified V2 Vault CRM Server listening on port ${PORT}`);
+    console.log(`🚀 Unified Server Listening on ${PORT}`);
   });
 }
 
