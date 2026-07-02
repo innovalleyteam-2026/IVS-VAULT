@@ -6,6 +6,8 @@ import AdminDashboard from './Admin';
 import EmployeeDashboard from './EmployeeDashboard'; 
 import ClientPortal from './ClientPortal';
 import { LogOut } from 'lucide-react';
+// Find this line at the top of Admin.jsx and add the icons
+import { Edit3, Trash2 } from 'lucide-react';
 import { 
   projectAPI, 
   credentialAPI, 
@@ -58,6 +60,9 @@ export default function App() {
     const [modalEmployees, setModalEmployees] = useState([]);
     const [modalClients, setModalClients] = useState([]);
     
+    // Add these in your Admin component
+const [isEditing, setIsEditing] = useState(false);
+const [editingProjectId, setEditingProjectId] = useState(null);
     const handleLogout = async () => {
         await supabase.auth.signOut();
         window.location.reload(); 
@@ -185,17 +190,66 @@ export default function App() {
         }
     };
 
-    const handleCreateProject = async (e) => {
-        e.preventDefault();
-        try {
-            await projectAPI.create(newProj);
-            await loadDashboardData();
-            setShowNewProjModal(false);
-            setNewProj({ name: '', client_name: '', status: 'Active', start_date: '', due_date: '', description: '', remarks: '' });
-        } catch (err) {
-            alert("Error creating project: " + err.message);
-        }
+    const handleDeleteProject = async (id) => {
+    if (!window.confirm("Are you sure you want to delete this project?")) return;
+    
+    try {
+        // Assuming you have a projectAPI or similar service
+        await projectAPI.delete(id); 
+        // Refresh the list after deletion
+        await loadDashboardData(); 
+    } catch (err) {
+        console.error("Delete error:", err);
+        alert("Failed to delete project: " + err.message);
+    }
+};
+const handleEditProject = (project) => {
+    setEditingProjectId(project.id);
+    setIsEditing(true);
+    // Populate the form state with the existing project data
+    setNewProj({
+        name: project.name,
+        client_name: project.client_name,
+        status: project.status,
+        description: project.description || '',
+        start_date: project.start_date || '',
+        due_date: project.due_date || '',
+        remarks: project.remarks || ''
+    });
+    setShowNewProjModal(true);
+};
+
+     const handleCreateProject = async (e) => {
+    e.preventDefault();
+    
+    const payload = {
+        name: newProj.name,
+        client_name: newProj.client_name,
+        status: newProj.status,
+        description: newProj.description,
+        start_date: newProj.start_date || null,
+        due_date: newProj.due_date || null,
+        remarks: newProj.remarks
     };
+
+    try {
+        if (isEditing) {
+            // Update existing project
+            await projectAPI.update(editingProjectId, payload);
+        } else {
+            // Create new project
+            await projectAPI.create(payload);
+        }
+        
+        await loadDashboardData();
+        setShowNewProjModal(false);
+        setIsEditing(false); // Reset mode
+        setEditingProjectId(null);
+        // Reset form...
+    } catch (err) {
+        alert("Operation failed: " + err.message);
+    }
+};
 
     const triggerPasswordDecryption = (credId) => {
         setSecurityPrompt({ show: true, targetId: credId, tokenInput: '' });
@@ -401,16 +455,34 @@ export default function App() {
                                                         onClick={() => selectProjectWorkspace(p)}
                                                         className="p-4 bg-slate-950 border border-slate-800/80 rounded-xl cursor-pointer hover:border-violet-500 hover:bg-slate-900/40 transition flex flex-col justify-between space-y-3 shadow-sm group"
                                                     >
-                                                        <div>
-                                                            <div className="flex justify-between items-start gap-2">
-                                                                <h4 className="text-sm font-bold text-white group-hover:text-violet-400 transition">{p.name}</h4>
-                                                                <span className={`text-[9px] font-mono font-bold px-2 py-0.5 rounded-full border ${p.status === 'Active' ? 'bg-emerald-950/40 text-emerald-400 border-emerald-900/60' : 'bg-slate-900 text-slate-400 border-slate-800'}`}>{p.status}</span>
-                                                            </div>
-                                                            <p className="text-xs text-slate-400">Client: {p.client_name}</p>
-                                                            {p.description && (
-                                                                <p className="text-[11px] text-slate-500 line-clamp-2 mt-2 bg-slate-900/50 p-2 rounded border border-slate-800/30 font-sans">{p.description}</p>
-                                                            )}
-                                                        </div>
+                                                        <div className="flex justify-between items-start gap-2">
+    {/* Project Name */}
+    <h4 className="text-sm font-bold text-white group-hover:text-violet-400 transition">{p.name}</h4>
+    
+    {/* Status and Action Icons Container */}
+    <div className="flex items-center gap-3">
+        {/* Status Badge */}
+        <span className={`text-[9px] font-mono font-bold px-2 py-0.5 rounded-full border ${p.status === 'Active' ? 'bg-emerald-950/40 text-emerald-400 border-emerald-900/60' : 'bg-slate-900 text-slate-400 border-slate-800'}`}>
+            {p.status}
+        </span>
+
+        {/* Action Icons (Visible on Hover) */}
+        <div className="flex gap-2 opacity-0 group-hover:opacity-100 transition">
+            <button 
+                onClick={(e) => { e.stopPropagation(); handleEditProject(p); }} 
+                className="text-slate-500 hover:text-blue-400"
+            >
+                <Edit3 className="w-3.5 h-3.5" />
+            </button>
+            <button 
+                onClick={(e) => { e.stopPropagation(); handleDeleteProject(p.id); }} 
+                className="text-slate-500 hover:text-red-400"
+            >
+                <Trash2 className="w-3.5 h-3.5" />
+            </button>
+        </div>
+    </div>
+</div>
                                                         <div className="text-[10px] font-mono text-slate-500 border-t border-slate-900 pt-2 flex justify-between items-center">
                                                             <button 
                                                                 type="button" 
@@ -894,12 +966,35 @@ export default function App() {
 
                             {/* Row 3: Status & Comments */}
                             <div><label className="block text-slate-400 mb-1">Operational Lifecycle Status</label><select value={newProj.status} onChange={e => setNewProj({...newProj, status: e.target.value})} className="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-white focus:outline-none"><option value="Active">Active</option><option value="On Hold">On Hold</option><option value="Completed">Completed</option></select></div>
-                            
+                            {/* Row 4: Dates */}
+<div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+    <div>
+        <label className="block text-slate-400 mb-1">Start Date *</label>
+        <input 
+            required 
+            type="date" 
+            value={newProj.start_date || ''} 
+            onChange={e => setNewProj({...newProj, start_date: e.target.value})} 
+            className="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-white focus:outline-none" 
+        />
+    </div>
+    <div>
+        <label className="block text-slate-400 mb-1">Due Date *</label>
+        <input 
+            required 
+            type="date" 
+            min={newProj.start_date} // Enforces the rule: cannot select before start_date
+            value={newProj.due_date || ''} 
+            onChange={e => setNewProj({...newProj, due_date: e.target.value})} 
+            className="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-white focus:outline-none" 
+        />
+    </div>
+</div>
                             <div>
-                                <label className="block text-slate-400 mb-1">Comments</label>
+                                <label className="block text-slate-400 mb-1">Remarks</label>
                                 <textarea 
-                                    value={newProj.comments} 
-                                    onChange={e => setNewProj({...newProj, comments: e.target.value})} 
+                                    value={newProj.remarks} 
+                                    onChange={e => setNewProj({...newProj, remarks: e.target.value})} 
                                     placeholder="Add project notes here..." 
                                     className="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-white focus:outline-none h-20 resize-none"
                                 />

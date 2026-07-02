@@ -103,9 +103,9 @@ app.get('/api/projects', async (req, res) => {
 
 app.post('/api/projects', async (req, res) => {
   try {
-    const { name, client_name, status, start_date, due_date, description, remarks, email, phone, comments } = req.body;
+    const { name, client_name, status, start_date, due_date, description, remarks, email, phone } = req.body;
     const { data, error } = await supabase.from('projects').insert([{
-      name, client_name, status, start_date, due_date, description, remarks, email, phone, comments, created_at: new Date()
+      name, client_name, status, start_date, due_date, description, remarks, email, phone, created_at: new Date()
     }]).select();
 
     if (error) return res.status(400).json({ error: error.message });
@@ -369,6 +369,43 @@ app.put('/api/profiles/:id', async (req, res) => {
     res.status(500).json({ error: err.message });
   }
 });
+// Add these routes to your existing express app in server.js
+
+// --- DELETE PROJECT ---
+app.delete('/api/projects/:id', async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { data, error } = await supabase
+      .from('projects')
+      .delete()
+      .eq('id', id);
+
+    if (error) return res.status(400).json({ error: error.message });
+    res.json({ message: "Project deleted successfully" });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// --- EDIT/UPDATE PROJECT ---
+app.put('/api/projects/:id', async (req, res) => {
+  try {
+    const { id } = req.params;
+    const updateData = req.body; // Ensure this contains only valid column names
+
+    const { data, error } = await supabase
+      .from('projects')
+      .update(updateData)
+      .eq('id', id)
+      .select();
+
+    if (error) return res.status(400).json({ error: error.message });
+    res.json(data[0]);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
 
 // Locate this block at the bottom of backend/server.js:
 const PORT = process.env.PORT || 5000;
