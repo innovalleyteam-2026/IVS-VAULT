@@ -1,8 +1,13 @@
 {
-  "name": "project-vault-crm-root",
+  "name": "project-vault-root",
   "version": "1.0.0",
   "type": "module",
-  "private": true,
+  "dependencies": {
+    "express": "^4.18.2",
+    "cors": "^2.8.5",
+    "dotenv": "^16.0.0",
+    "@supabase/supabase-js": "^2.0.0"
+  },
   "engines": {
     "node": "22.x"
   },
@@ -10,3 +15,4 @@
     "build": "npm install --prefix backend && npm install --prefix frontend && npm run build --prefix frontend"
   }
 }
+
