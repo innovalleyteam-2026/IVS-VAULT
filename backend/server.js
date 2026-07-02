@@ -370,11 +370,14 @@ app.put('/api/profiles/:id', async (req, res) => {
   }
 });
 
+// Locate this block at the bottom of backend/server.js:
 const PORT = process.env.PORT || 5000;
+
 if (process.env.NODE_ENV !== 'production') {
   app.listen(PORT, () => {
-    console.log(`🚀 Unified Server Listening on ${PORT}`);
+    console.log(`🚀 Unified V2 Vault CRM Server listening on port ${PORT}`);
   });
 }
 
+// 👇 CRITICAL: Export the Express app instance so Vercel can wrapper-bind it 
 export default app;
