@@ -670,8 +670,20 @@ const handleEditProject = (project) => {
                                 <div className="flex gap-2 items-center">
                                     <div className="flex-1 flex justify-between items-center bg-slate-950 px-2.5 py-1.5 rounded-lg border border-slate-800">
                                         <span className="font-mono text-xs">PWD: <span className="text-violet-400 font-sans font-bold ml-1">{decryptedPasswords[c.id] || '••••••••'}</span></span>
-                                        <button onClick={() => triggerPasswordDecryption(c.id)} className="p-1 text-slate-400 hover:text-white bg-slate-900 rounded border border-slate-800"><Eye className="w-3.5 h-3.5" /></button>
-                                    </div>
+<button 
+    onClick={() => {
+        // If password is already visible, hide it
+        if (decryptedPasswords[c.id]) {
+            setDecryptedPasswords(prev => ({ ...prev, [c.id]: null }));
+        } else {
+            // Show it directly (assuming c.encrypted_password is the raw string)
+            setDecryptedPasswords(prev => ({ ...prev, [c.id]: c.encrypted_password }));
+        }
+    }} 
+    className="p-1 text-slate-400 hover:text-white bg-slate-900 rounded border border-slate-800"
+>
+    <Eye className="w-3.5 h-3.5" />
+</button>                                    </div>
                                     <button type="button" onClick={() => setEditingCredential(c)} className="text-xs bg-slate-900 border border-slate-800 px-3 py-2 rounded-lg text-slate-300">Edit</button>
                                 </div>
                             </div>
